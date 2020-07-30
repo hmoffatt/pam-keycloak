@@ -1,0 +1,2 @@
+git+https://github.com/hmoffatt/python-keycloak.git@python2#egg=python-keycloak
+python-dotenv==0.14.0
