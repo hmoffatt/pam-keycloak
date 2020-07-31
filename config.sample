@@ -1,4 +1,4 @@
-SERVER_URL=https://keycloak.myco.com/auth/
-CLIENT_ID=pam
-REALM_NAME=staff
-CLIENT_SECRET_KEY=00000000-0000-0000-0000-000000000000
+server_url=https://keycloak.myco.com/auth/
+client_id=pam
+realm_name=staff
+client_secret_key=00000000-0000-0000-0000-000000000000

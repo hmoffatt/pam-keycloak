@@ -3,7 +3,7 @@ activate_this = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.pyve
 exec(compile(open(activate_this).read(), activate_this, 'exec'), dict(__file__=activate_this))
 
 import syslog
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from keycloak import KeycloakOpenID
 from keycloak.exceptions import KeycloakError
 
@@ -12,12 +12,38 @@ DEFAULT_USER = "nobody"
 
 syslog.openlog(logoption=syslog.LOG_PID, facility=syslog.LOG_AUTH)
 
+options = {}
+
+
+def parse_options(pamh, argv):
+    global options
+    for arg in argv[1:]:
+        args = arg.split('=')
+        if len(args) > 1:
+            options[args[0]] = args[1]
+        else:
+            options[args[0]] = True
+
+    try:
+        config_file = options.get('config')
+        if config_file:
+            if not os.path.isabs(config_file):
+                config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), config_file)
+            options.update(dotenv_values(config_file))
+
+    except Exception as e:
+        pam_syslog(syslog.LOG_CRIT, pamh, "auth", "failed to read configuration: %s" % e)
+        return pamh.PAM_SYSTEM_ERR
+
 
 def pam_syslog(prio, pamh, choice, message):
+    #print("pam_keycloak(%s:%s): %s" % (pamh.service, choice, message))
     syslog.syslog(prio, "pam_keycloak(%s:%s): %s" % (pamh.service, choice, message))
 
 
 def pam_sm_authenticate(pamh, flags, argv):
+    parse_options(pamh, argv)
+
     try:
         user = pamh.get_user(None)
     except pamh.exception, e:
@@ -25,18 +51,13 @@ def pam_sm_authenticate(pamh, flags, argv):
     if user is None:
         pamh.user = DEFAULT_USER
 
-    config_file = argv[1]  # argv[0] is the script name
-    if not os.path.isabs(config_file):
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), config_file)
-
-    load_dotenv(dotenv_path=config_file, verbose=True)
-
     try:
         # Configure client
-        keycloak_openid = KeycloakOpenID(server_url=os.getenv('SERVER_URL'),
-                                         realm_name=os.getenv('REALM_NAME'),
-                                         client_id=os.getenv('CLIENT_ID'),
-                                         client_secret_key=os.getenv('CLIENT_SECRET_KEY'))
+        keycloak_openid = KeycloakOpenID(server_url=options['server_url'],
+                                         realm_name=options['realm_name'],
+                                         client_id=options['client_id'],
+                                         client_secret_key=options['client_secret_key'],
+                                         verify=True)
 
         # Get WellKnow
         config_well_know = keycloak_openid.well_know()
